@@ -46,7 +46,7 @@ export const createUser = (data: {
     password: data.password,
     first_name: data.first_name || "",
     last_name: data.last_name || "",
-    email: data.email || "",
+    email: data.email || null,
     photo_url: data.photo_url || "",
   });
 
@@ -107,7 +107,7 @@ export const updateUserProfile = (
     id,
     first_name: updated.first_name || "",
     last_name: updated.last_name || "",
-    email: updated.email || "",
+    email: updated.email || null,
     username: updated.username,
     photo_url: updated.photo_url || "",
   });
