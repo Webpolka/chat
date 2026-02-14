@@ -12,6 +12,7 @@ import bcrypt from "bcryptjs";
 export const registerService = (data: {
   username: string;
   password: string;
+  avatarUrl: string;
 }): {
   user: SafeUser;
   tokens: Tokens;
@@ -25,6 +26,7 @@ export const registerService = (data: {
     const user = createUser({
       username: data.username,
       password: hashedPassword,
+      photo_url: data.avatarUrl,
     });
     const tokens = generateTokens(user.id);
 

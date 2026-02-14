@@ -96,19 +96,26 @@ export const AuthProvider = ({ children }: Props) => {
  * REGISTER - делает POST /auth/register
  * После успешного login автоматически обновляет состояние и можно подключать сокет
  */
-  const register = async (registerData: { username: string; password: string, avatar: File }) => {
+  const register = async (registerData: { username: string; password: string; avatar: File }) => {
     try {
-      const { data } = await api.post("/auth/register", registerData);
+      const formData = new FormData();
+      formData.append("username", registerData.username);
+      formData.append("password", registerData.password);
+      formData.append("avatar", registerData.avatar);
+
+      const { data } = await api.post("/auth/register", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
       setUser(data.user);
       setIsAuth(true);
-      console.log("Register success ! Data of current User :", data.user);
     } catch (err) {
-      console.log("Register error:", err);
       setIsAuth(false);
       setUser(null);
       throw err;
     }
   };
+
 
   /**
    * logout - делает POST /auth/logout

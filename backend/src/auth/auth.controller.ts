@@ -5,12 +5,13 @@ import {
   refreshService,
   logoutService,
 } from "./auth.service.js";
+import { saveAvatar } from "../utils/saveAvatar.js";
 
 /**
  * POST /auth/register
  * Регистрация нового пользователя и установка httpOnly cookies с токенами
  */
-export const registerController = (req: Request, res: Response) => {
+export const registerController = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
@@ -19,7 +20,18 @@ export const registerController = (req: Request, res: Response) => {
       return res.status(400).json({ error: "username и password обязательны" });
     }
 
-    const { user, tokens } = registerService({ username, password });
+    if (!req.file) {
+      return res.status(400).json({ error: "Аватар обязателен" });
+    }
+
+    //  сохраняем аватар
+    const avatarUrl = await saveAvatar(req.file);
+
+    const { user, tokens } = await registerService({
+      username,
+      password,
+      avatarUrl,
+    });
 
     // Установка httpOnly cookies
     res.cookie("accessToken", tokens.accessToken, {
@@ -77,7 +89,7 @@ export const loginController = (req: Request, res: Response) => {
     res.json({ ok: true, user });
   } catch (err: any) {
     console.error("Login error:", err);
-     res.status(401).json({ ok: false, error: err.message });
+    res.status(401).json({ ok: false, error: err.message });
   }
 };
 

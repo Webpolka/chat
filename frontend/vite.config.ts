@@ -22,6 +22,7 @@ export default defineConfig({
         ws: true, // обязательно для WebSocket
         changeOrigin: true,
       },
+      "/uploads": "http://localhost:3000", // твой бекенд
     },
     host: true, // разрешаем все хосты
     strictPort: true,

@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
@@ -30,21 +31,36 @@ app.use(
 // ---------------------- AUTH ROUTES ----------------------
 app.use("/auth", authRouter);
 
-// ---------------------- Статика фронтенда ----------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const frontendPath = path.join(__dirname, "../../frontend/dist");
-app.use(express.static(frontendPath));
-app.use((req, res) => {
-  const file = path.join(frontendPath, "index.html");
-  res.sendFile(file, (err) => {
-    if (err) {
-      console.error("Failed to send index.html:", err);
-      res.status(500).send("Server error");
-    }
-  });
-});
 
+// ---------------------- Open UPLOADS ----------------------
+const uploadsPath = path.join(__dirname, "../../uploads");
+const avatarsPath = path.join(uploadsPath, "avatars");
+
+fs.mkdirSync(avatarsPath, { recursive: true });
+app.use("/uploads", express.static(uploadsPath));
+
+// ---------------------- Статика фронтенда ----------------------
+const frontendPath = path.join(__dirname, "../../frontend/dist");
+
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+  app.use((req, res) => {
+    const file = path.join(frontendPath, "index.html");
+    res.sendFile(file, (err) => {
+      if (err) {
+        console.error("Failed to send index.html:", err);
+        res.status(500).send("Server error");
+      }
+    });
+  });
+} else {
+  // фронт не собран → dev режим
+  console.warn(
+    `Frontend dist folder not found at ${frontendPath}. Skipping static serving.`,
+  );
+}
 
 // ---------------------- Инициализация сервера ----------------------
 
@@ -62,5 +78,3 @@ try {
 } catch (err) {
   console.error("Server failed:", err);
 }
-
-
