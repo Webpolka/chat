@@ -23,7 +23,7 @@ import type {
 } from "../types.js";
 
 import { JWT_ACCESS_SECRET } from "../config.js";
-import { getUserById, updateUserProfile } from "../db/user.store.js"; // модуль БД
+import { getUserById, updateUserProfile } from "../db/user.db.js"; // модуль БД
 
 /**
  * Инициализация Chat Server

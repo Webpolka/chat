@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { User } from "../types.js";
 
 // ================== Инициализация БД ==================
-const db = new Database("app.db");
+const db = new Database("./src/db/app.db");
 
 // Создание таблицы users, если её нет
 db.prepare(`

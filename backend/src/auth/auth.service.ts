@@ -3,7 +3,7 @@ import {
   createUser,
   getUserByUsername,
   getUserById,
-} from "../db/user.store.js";
+} from "../db/user.db.js";
 import { generateTokens, verifyRefresh } from "./token.service.js";
 import { SafeUser, Tokens } from "../types.js";
 import bcrypt from "bcryptjs";
