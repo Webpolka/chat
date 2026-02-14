@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+   "target": "ES2020",
+     "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    },
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "moduleDetection": "force",  // <- добавляем, чтобы TS правильно разрешал модули без .js
+    "allowImportingTsExtensions": false  // <- запрещаем указывать .ts
+  },
+  "include": ["src/**/*", "src/games/checkers/types.ts"],
+  "exclude": ["node_modules", "dist"]
+}

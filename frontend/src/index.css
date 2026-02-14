@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@keyframes gradient-x {
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 8s ease infinite;
+}
+
+body {
+  background-color: #98938d;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.modal-bg {
+  background-image: url('/images/modal-bg.webp');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+}
+
+.login-bg {
+  background-image: url('/images/login-bg.webp');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+}
+
+/********************************************
+Лоадер
+*******************************************/
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

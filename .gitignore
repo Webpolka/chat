@@ -1,0 +1,13 @@
+# Игнорировать node_modules везде
+node_modules/
+
+# Если вдруг есть node_modules в подпапках
+frontend/node_modules/
+backend/node_modules/
+
+# Системные файлы и лишнее
+.DS_Store
+.env
+*.log
+dist/
+build/
