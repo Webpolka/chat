@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/app/providers/auth/useAuth";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/shared/api/axios";
+import { useSocket } from "@/app/providers/socket/useSocket";
 
 export interface UserProfile {
     nickname: string;
@@ -13,10 +14,12 @@ interface ProfileDropdownProps {
     profile?: UserProfile | null;
 }
 
+
 export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ profile }) => {
     const [open, setOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const { socket } = useSocket();
 
     const { checkAuth } = useAuth();
     const navigate = useNavigate();
@@ -28,6 +31,8 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ profile }) => 
 
             // обновляем состояние auth
             await checkAuth();
+           
+            socket?.emit("logout"); // ставим оффлайн на сервере
 
             // редирект на страницу входа
             navigate("/auth");

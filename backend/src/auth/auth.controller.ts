@@ -132,6 +132,7 @@ export const refreshController = (req: Request, res: Response) => {
  * Очистка токенов и httpOnly cookies
  */
 export const logoutController = (_req: Request, res: Response) => {
+  
   logoutService(); // Можно расширить логику (например, инвалидировать refresh токены)
 
   res.clearCookie("accessToken", {
