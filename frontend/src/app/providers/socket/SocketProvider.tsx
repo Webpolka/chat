@@ -19,88 +19,88 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
   const [socket] = useState<Socket>(getSocket());
 
   const setDialogs = useChatStore((s) => s.setDialogs);
-  const setDialogsMessages = useChatStore((s) => s.setDialogsMessages);
-  const sendMessage = useChatStore((s) => s.sendMessage);
+  const setDialogMessages = useChatStore((s) => s.setDialogMessages);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
-  const updateUserStatus = useChatStore((s) => s.updateUserStatus);
   const updateUserProfile = useChatStore((s) => s.updateUserProfile);
   const startTyping = useChatStore((s) => s.startTyping);
   const stopTyping = useChatStore((s) => s.stopTyping);
 
+  const setUsers = useChatStore((s) => s.setUsers);
+
+
   useEffect(() => {
     if (!user) return;
-  }, [user]);
 
-
-  useEffect(() => {
     const s = socket;
-    // ------------------- CONNECT -------------------
-    s.on("connect", () => {
-      console.log("[SOCKET] Connected:", s.id);
-      s.emit("register_user"); // регистрация текущего пользователя
-    });
 
-    s.on("disconnect", (reason) => {
-      console.log("[SOCKET] Disconnected:", reason);
-    });
+    // ВСЕ пользователи из БД
+    // Получаем всех пользователей при подключении
+    s.emit("get_users");
 
-    // ------------------- DIALOG EVENTS -------------------
-    s.on("dialogs_list", (dialogs: Dialog[]) => setDialogs(dialogs));
-    s.on("messages_list", (dialogId: string, messages: Message[]) =>
-      setDialogsMessages(dialogId, messages)
-    );
+    s.on("users_list", (users) => setUsers(users));
 
-    type IncomingMessage = Message & { tempId?: string };
-
-    s.on("new_message", (message: IncomingMessage) => {
-      // Приходят authoritative сообщения от сервера
-      const { messages } = useChatStore.getState();
-      const arr = messages[message.dialogId] || [];
-      const filtered = arr.filter((m) => m.id !== message.tempId);
-      useChatStore.setState({
-        messages: {
-          ...messages,
-          [message.dialogId]: [...filtered, message],
-        },
-      });
-
-    });
-
-    s.on("message_deleted", (messageId: string, dialogId: string) => {
-      deleteMessage(dialogId, messageId);
-    });
-
-    // ------------------- USER STATUS -------------------
-    s.on("user_online", (userId: string) => updateUserStatus(userId, true));
-    s.on("user_offline", (userId: string, lastSeen: number) =>
-      updateUserStatus(userId, false, lastSeen)
-    );
-
-    // ------------------- USER PROFILE -------------------
-    s.on("user_updated", (user: User) => {
+    s.on("user_status_updated", (user) => {
       updateUserProfile(user);
     });
 
-    // ------------------- TYPING -------------------
-    s.on(
-      "user_typing",
-      ({ dialogId
-        // , userId 
-      }: { dialogId: string; userId: string }) =>
-        startTyping(dialogId)
+
+    // ---------------- CONNECT ----------------
+    s.on("connect", () => {
+      s.emit("register_user");
+      console.log("Socket connected:", socket.id);
+
+      s.emit("get_users");
+
+      s.emit("get_dialogs");
+
+      s.on("user_status_updated", (user) => {
+        updateUserProfile(user);
+      });
+    });
+
+    s.on("disconnect", () => { });
+
+
+    // ---------------- DIALOG EVENTS ----------------
+    s.on("dialogs_list", (dialogs: Dialog[]) => setDialogs(dialogs));
+
+    s.on("messages_list", (dialogId: string, messages: Message[]) =>
+      setDialogMessages(dialogId, messages)
     );
-    s.on(
-      "user_stop_typing",
-      ({ dialogId
-        // , userId 
-      }: { dialogId: string; userId: string }) =>
-        stopTyping(dialogId)
+
+    s.on("new_message", (message: Message) => {
+      const { messages } = useChatStore.getState();
+      const dialogMessages = messages[message.dialogId] || [];
+      useChatStore.setState({
+        messages: {
+          ...messages,
+          [message.dialogId]: [...dialogMessages, message],
+        },
+      });
+    });
+
+
+    s.on("message_deleted", (messageId: string, dialogId: string) =>
+      deleteMessage(dialogId, messageId)
+    );
+
+    // ---------------- USER STATUS ----------------
+
+    // ---------------- USER PROFILE ----------------
+    s.on("user_updated", (user: User) => updateUserProfile(user));
+
+    // ---------------- TYPING ----------------
+    s.on("user_typing", ({ dialogId }: { dialogId: string }) =>
+      startTyping(dialogId)
+    );
+    s.on("user_stop_typing", ({ dialogId }: { dialogId: string }) =>
+      stopTyping(dialogId)
     );
 
     return () => {
       s.offAny();
     };
-  }, [socket, setDialogs, setDialogsMessages, sendMessage, deleteMessage, updateUserStatus, updateUserProfile, startTyping, stopTyping]);
+  }, [user, socket, setDialogs, setDialogMessages, deleteMessage, updateUserProfile, startTyping, stopTyping]);
 
   return <SocketContext.Provider value={{ socket }}>{children}</SocketContext.Provider>;
 };

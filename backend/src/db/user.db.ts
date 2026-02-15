@@ -8,7 +8,8 @@ import type { User } from "../types.js";
 const db = new Database("./src/db/app.db");
 
 // Создание таблицы users, если её нет
-db.prepare(`
+db.prepare(
+  `
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -16,9 +17,12 @@ db.prepare(`
     first_name TEXT,
     last_name TEXT,
     email TEXT UNIQUE,
-    photo_url TEXT
+    photo_url TEXT,
+    online INTEGER DEFAULT 0,
+    last_seen INTEGER
   )
-`).run();
+`,
+).run();
 
 // ================== Функции ==================
 
@@ -34,7 +38,7 @@ export const createUser = (data: {
   photo_url?: string;
 }): User => {
   const id = uuidv4();
- 
+
   const stmt = db.prepare(`
     INSERT INTO users (id, username, password, first_name, last_name, email, photo_url)
     VALUES (@id, @username, @password, @first_name, @last_name, @email, @photo_url)
@@ -65,7 +69,9 @@ export const createUser = (data: {
  * Получение пользователя по ID
  */
 export const getUserById = (id: string): User | null => {
-  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as User | undefined;;
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
+    | User
+    | undefined;
   return row || null;
 };
 
@@ -73,7 +79,9 @@ export const getUserById = (id: string): User | null => {
  * Получение пользователя по username
  */
 export const getUserByUsername = (username: string): User | null => {
-  const row = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as User | undefined;;
+  const row = db
+    .prepare("SELECT * FROM users WHERE username = ?")
+    .get(username) as User | undefined;
   return row || null;
 };
 
@@ -82,16 +90,12 @@ export const getUserByUsername = (username: string): User | null => {
  */
 export const updateUserProfile = (
   id: string,
-  data: Partial<Omit<User, "id" | "password">>
+  data: Partial<Omit<User, "id" | "password">>,
 ): User | null => {
   const user = getUserById(id);
   if (!user) return null;
 
-  // Обновляем только поля, которые переданы
-  const updated = {
-    ...user,
-    ...data,
-  };
+  const updated = { ...user, ...data };
 
   const stmt = db.prepare(`
     UPDATE users SET
@@ -118,9 +122,38 @@ export const updateUserProfile = (
 /**
  * Проверка пароля пользователя
  */
-export const verifyPassword = (username: string, plainPassword: string): boolean => {
+export const verifyPassword = (
+  username: string,
+  plainPassword: string,
+): boolean => {
   const user = getUserByUsername(username);
   if (!user) return false;
 
   return bcrypt.compareSync(plainPassword, user.password);
+};
+
+// ================== ЧАТ: ВСЕ ПОЛЬЗОВАТЕЛИ ==================
+/**
+ * Получение всех пользователей из базы для чата
+ */
+export const getAllUsersFromDB = (): User[] => {
+  const rows = db.prepare("SELECT * FROM users").all() as User[];
+  return rows;
+};
+
+export const setUserOnlineStatus = (
+  id: string,
+  online: boolean,
+): User | null => {
+  const now = Date.now();
+  const stmt = db.prepare(`
+    UPDATE users SET online=@online, last_seen=@lastSeen WHERE id=@id
+  `);
+  stmt.run({
+    id,
+    online: online ? 1 : 0,
+    lastSeen: online ? null : now, // online=true → lastSeen=null, offline → ставим время выхода
+  });
+
+  return getUserById(id);
 };

@@ -1,37 +1,65 @@
-import type { Server as SocketServer } from "socket.io";
+import { Server as SocketServer } from "socket.io";
 import jwt from "jsonwebtoken";
+import { JWT_ACCESS_SECRET } from "../config.js";
 import {
-  chatStore,
-  createOrUpdateUser,
-  disconnectUserSocket,
-  getUserBySocket,
-  getOrCreateDialog,
-  getUserDialogs,
-  getDialogMessages,
-  addMessage,
-  deleteMessage,
-  markMessageSeen,
-  setTyping,
-  stopTyping,
-} from "./chat.store.js";
-
+  getUserById,
+  getAllUsersFromDB,
+  updateUserProfile,
+  setUserOnlineStatus,
+} from "../db/user.db.js";
 import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-  UserID,
   User,
+  UserID,
+  Dialog,
+  DialogID,
+  Message,
+  MessageID,
 } from "../types.js";
 
-import { JWT_ACCESS_SECRET } from "../config.js";
-import { getUserById, updateUserProfile } from "../db/user.db.js"; // модуль БД
+// ================== STORE ==================
+// Кеш пользователей и диалогов
+const users = new Map<UserID, User>();
+const dialogs = new Map<DialogID, Dialog>();
+const messages = new Map<DialogID, Message[]>();
 
-/**
- * Инициализация Chat Server
- */
-export const initChatServer = (
-  io: SocketServer<ClientToServerEvents, ServerToClientEvents>,
-) => {
-  // ================= Middleware: JWT =================
+// ================== HELPERS ==================
+const createOrUpdateUserCache = (dbUser: User): User => {
+  const user = users.get(dbUser.id);
+  if (!user) {
+    users.set(dbUser.id, { ...dbUser });
+    return dbUser;
+  }
+  Object.assign(user, dbUser);
+  return user;
+};
+
+const findDialogBetween = (a: UserID, b: UserID): Dialog | null => {
+  for (const d of dialogs.values())
+    if (d.participants.includes(a) && d.participants.includes(b)) return d;
+  return null;
+};
+
+const getOrCreateDialog = (a: UserID, b: UserID): Dialog => {
+  if (a === b) throw new Error("Cannot chat with yourself");
+  const existing = findDialogBetween(a, b);
+  if (existing) return existing;
+
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const d: Dialog = {
+    id,
+    participants: [a, b],
+    createdAt: now,
+    updatedAt: now,
+  };
+  dialogs.set(id, d);
+  messages.set(id, []);
+  return d;
+};
+
+// ================== CHAT SERVER ==================
+export const initChatServer = (io: SocketServer) => {
+  // ---------------- JWT Middleware ----------------
   io.use((socket, next) => {
     const cookie = socket.handshake.headers.cookie;
     if (!cookie) return next(new Error("Unauthorized"));
@@ -40,7 +68,6 @@ export const initChatServer = (
       .split("; ")
       .find((c) => c.startsWith("accessToken="))
       ?.split("=")[1];
-
     if (!token) return next(new Error("Unauthorized"));
 
     try {
@@ -49,150 +76,90 @@ export const initChatServer = (
       };
       socket.data.userId = payload.userId;
       next();
-    } catch (err) {
+    } catch {
       return next(new Error("Unauthorized: invalid token"));
     }
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     const userId = socket.data.userId as string;
-    console.log("New websocket connected:", socket.id, "userId:", userId);
+    console.log("Connected:", socket.id, userId);
 
-    const dbUser = getUserById(userId);
-    if (!dbUser) {
-      console.log("User not found in DB:", userId);
-      return socket.disconnect();
-    }
+    // ---------------- GET USER FROM DB ----------------
+    let dbUser = getUserById(userId);
+    if (!dbUser) return socket.disconnect();
 
-    // Создаем/обновляем пользователя в сторе при подключении
-    createOrUpdateUser(dbUser, socket.id);
+    // ---- Устанавливаем пользователя онлайн в БД ----
+    dbUser = setUserOnlineStatus(userId, true);   
+    // ---- Оповещаем всех фронтов, что пользователь онлайн ----
+    io.emit("user_status_updated", dbUser);
 
-    // Отправляем список диалогов сразу после подключения
-    const dialogs = getUserDialogs(userId);
-    socket.emit("dialogs_list", dialogs);
+    // ---- Отправляем список всех пользователей ----
+    const allUsers = getAllUsersFromDB();
+    socket.emit("users_list", allUsers);
 
-    // ================= register_user =================
-    // Фронт шлёт это после появления user в AuthProvider
-    socket.on("register_user", () => {
-      const userId = socket.data.userId;
-      if (!userId) return;
+    // ================= SOCKET EVENTS =================
 
-      const dbUser = getUserById(userId); // берем актуальные данные
-      if (!dbUser) return;
-
-      const user = createOrUpdateUser(dbUser, socket.id);
-      socket.broadcast.emit("user_online", user.id);
-    });
-    // ================= Socket Events =================
-
-    // -------- GET DIALOGS --------
-    socket.on("get_dialogs", () => {
-      const user = getUserBySocket(socket.id);
-      if (!user) return;
-      socket.emit("dialogs_list", getUserDialogs(user.id));
+    // Получить список пользователей по запросу
+    socket.on("get_users", () => {
+      const allUsers = getAllUsersFromDB();
+      socket.emit("users_list", allUsers);
     });
 
-    // -------- OPEN DIALOG --------
-    socket.on("open_dialog", (otherUserId: UserID) => {
-      const user = getUserBySocket(socket.id);
-      if (!user) return;
-
-      const dialog = getOrCreateDialog(user.id, otherUserId);
-      const messages = getDialogMessages(dialog.id);
-
-      // Присоединяем пользователя к комнате диалога
+    // Открыть диалог
+    socket.on("open_dialog", (otherId: UserID) => {
+      const dialog = getOrCreateDialog(userId, otherId);
       socket.join(dialog.id);
-
-      socket.emit("messages_list", dialog.id, messages);
+      socket.emit("messages_list", dialog.id, messages.get(dialog.id) || []);
     });
 
-    // -------- SEND MESSAGE --------
+    // Отправить сообщение
     socket.on("send_message", (data) => {
-      const user = getUserBySocket(socket.id);
-      if (!user) return;
+      const dialog = dialogs.get(data.dialogId);
+      if (!dialog) return;
 
-      const message = addMessage({
+      const msg: Message = {
+        id: crypto.randomUUID(),
         dialogId: data.dialogId,
-        senderId: user.id,
+        senderId: userId,
         type: data.type,
         text: data.text,
         attachments: data.attachments,
-      });
+        createdAt: Date.now(),
+        deleted: false,
+        seenBy: [userId],
+      };
+      messages.get(data.dialogId)?.push(msg);
+      dialog.lastMessageId = msg.id;
+      dialog.updatedAt = Date.now();
 
-      // Отправляем сообщение всем участникам комнаты
-      io.to(data.dialogId).emit("new_message", message);
+      io.to(data.dialogId).emit("new_message", msg);
     });
 
-    // -------- DELETE MESSAGE --------
-    socket.on("delete_message", (messageId, dialogId) => {
-      deleteMessage(messageId, dialogId);
-      io.to(dialogId).emit("message_deleted", messageId, dialogId);
+    // Печатает/не печатает
+    socket.on("typing_start", (dialogId: DialogID) => {
+      socket.to(dialogId).emit("user_typing", { dialogId, userId });
     });
 
-    // -------- TYPING --------
-    socket.on("typing_start", (dialogId) => {
-      const user = getUserBySocket(socket.id);
-      if (!user) return;
-
-      setTyping(dialogId, user.id);
-      io.to(dialogId).emit("user_typing", { dialogId, userId: user.id });
+    socket.on("typing_stop", (dialogId: DialogID) => {
+      socket.to(dialogId).emit("user_stop_typing", { dialogId, userId });
     });
 
-    socket.on("typing_stop", (dialogId) => {
-      const user = getUserBySocket(socket.id);
-      if (!user) return;
-
-      stopTyping(dialogId, user.id);
-      io.to(dialogId).emit("user_stop_typing", { dialogId, userId: user.id });
+    // Обновление профиля пользователя
+    socket.on("update_user", (data) => {
+      const updatedDbUser = updateUserProfile(userId, data);
+      if (!updatedDbUser) return;
+      createOrUpdateUserCache(updatedDbUser);
+      io.emit("user_updated", updatedDbUser);
     });
 
-    // -------- MESSAGE SEEN --------
-    socket.on("message_seen", (dialogId) => {
-      const user = getUserBySocket(socket.id);
-      if (!user) return;
-
-      markMessageSeen(dialogId, user.id);
-      io.to(dialogId).emit("messages_seen", dialogId, user.id);
-    });
-
-    // -------- UPDATE USER PROFILE --------
-
-    socket.on(
-      "update_user",
-      (
-        updatedData: Partial<
-          Omit<
-            User,
-            "id" | "password" | "sockets" | "online" | "lastSeen" | "typingIn"
-          >
-        >,
-      ) => {
-        const user = getUserBySocket(socket.id);
-        if (!user) return;
-
-        // ---- Обновляем профиль в БД ----
-        const updatedDbUser = updateUserProfile(user.id, updatedData);
-        if (!updatedDbUser) return;
-
-        // ---- Обновляем стор ----
-        const updatedUser = createOrUpdateUser(updatedDbUser, socket.id);
-
-        // ---- Рассылаем обновленного юзера всем ----
-        socket.broadcast.emit("user_updated", updatedUser);
-        socket.emit("user_updated", updatedUser);
-      },
-    );
-
-    // -------- DISCONNECT --------
+    // Отключение пользователя
     socket.on("disconnect", () => {
-      const user = disconnectUserSocket(socket.id);
-      if (user) {
-        socket.broadcast.emit(
-          "user_offline",
-          user.id,
-          user.lastSeen ?? Date.now(),
-        );
-      }
+      const offlineUser = setUserOnlineStatus(userId, false);
+      console.log(`User offline: ${offlineUser?.username}`);
+
+      // ---- Оповещаем всех фронтов, что пользователь оффлайн ----
+      io.emit("user_status_updated", offlineUser);
     });
   });
 };
