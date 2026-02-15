@@ -23,6 +23,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ profile }) => 
 
     const { checkAuth } = useAuth();
     const navigate = useNavigate();
+  
 
     const handleLogout = async () => {
         try {
@@ -32,7 +33,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ profile }) => 
             // обновляем состояние auth
             await checkAuth();
            
-            socket?.emit("logout"); // ставим оффлайн на сервере
+            socket?.emit("user_logout"); // ставим оффлайн на сервере
 
             // редирект на страницу входа
             navigate("/auth");
@@ -71,7 +72,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ profile }) => 
                     <img
                         src={profile.avatarUrl}
                         alt="avatar"
-                        className="w-12 h-12 rounded-full object-cover border-2 border-white outline-green-300 outline-2"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-white outline-green-300 outline-2 shrink-0"
                     />
                 ) : (
                     <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold">

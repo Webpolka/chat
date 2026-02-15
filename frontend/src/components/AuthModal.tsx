@@ -1,6 +1,7 @@
 import { type FC, useState, useCallback } from "react";
 import { useAuth } from "@/app/providers/auth/useAuth";
 import { useDropzone } from "react-dropzone";
+import { generateId } from "@/utils/generate";
 
 type AuthModalProps = {
   type: "login" | "register";
@@ -147,7 +148,9 @@ export const AuthModal: FC<AuthModalProps> = ({ type, isOpen, onClose }) => {
           <input
             type="text"
             placeholder="Никнейм"
+            name={generateId()}
             value={nickname}
+            autoComplete="off"
             onChange={handleNicknameChange}
             className={`rounded-[30px] py-[15px] px-[30px] text-[14px] w-full text-white transition-colors focus:outline-gray-300
             ${touched && !isNicknameValid ? "border border-red-300" : "border border-gray-300"}`}
@@ -159,6 +162,8 @@ export const AuthModal: FC<AuthModalProps> = ({ type, isOpen, onClose }) => {
             type="password"
             placeholder="Пароль"
             value={password}
+             name={generateId()}
+            autoComplete="new-password"
             onChange={(e) => {
               setPassword(e.target.value);
               setError("");

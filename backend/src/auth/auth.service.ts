@@ -1,4 +1,3 @@
-import type { User } from "../types.js";
 import {
   createUser,
   getUserByUsername,
@@ -34,7 +33,7 @@ export const registerService = (data: {
     return { user: safeUser, tokens };
   } catch (err: any) {
     console.error("[registerService] Error:", err.message || err);
-    throw new Error("Ошибка при регистрации !");
+    throw err;
   }
 };
 

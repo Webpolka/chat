@@ -1,106 +1,86 @@
 // src/app/providers/socket/SocketProvider.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Socket } from "socket.io-client";
 import { SocketContext } from "./useSocket";
-import { getSocket } from "./socket";
+import { io } from "socket.io-client";
 import { useChatStore } from "@/store/chatStore";
-import type { Message, Dialog, User } from "@/types/types";
+import type { SafeUser } from "@/types/types";
 import { useAuth } from "../auth/useAuth";
 
 interface Props {
   children: React.ReactNode;
 }
 
-/**
- * SocketProvider - подключает сокет и синхронизирует chatStore
- */
 export const SocketProvider: React.FC<Props> = ({ children }) => {
   const { user } = useAuth();
-  const [socket] = useState<Socket>(getSocket());
-
-  const setDialogs = useChatStore((s) => s.setDialogs);
-  const setDialogMessages = useChatStore((s) => s.setDialogMessages);
-  const deleteMessage = useChatStore((s) => s.deleteMessage);
-  const updateUserProfile = useChatStore((s) => s.updateUserProfile);
-  const startTyping = useChatStore((s) => s.startTyping);
-  const stopTyping = useChatStore((s) => s.stopTyping);
-
   const setUsers = useChatStore((s) => s.setUsers);
+  const updateUserStatus = useChatStore((s) => s.updateUserStatus);
 
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
+  // -------- Создание нового сокета --------
+  const connectSocket = useCallback(() => {
+    if (!user?.id) return;
 
-    const s = socket;
+    // Закрываем старый сокет, если есть
+    if (socket) {
+      socket.disconnect();
+    }
 
-    // ВСЕ пользователи из БД
-    // Получаем всех пользователей при подключении
-    s.emit("get_users");
-
-    s.on("users_list", (users) => setUsers(users));
-
-    s.on("user_status_updated", (user) => {
-      updateUserProfile(user);
-    });
-
+    const s = io({ autoConnect: false });
+    setSocket(s);
 
     // ---------------- CONNECT ----------------
     s.on("connect", () => {
-      s.emit("register_user");
-      console.log("Socket connected:", socket.id);
+      console.log("Socket connected:", s.id);
 
+      // Сообщаем серверу, что юзер вошёл
+      s.emit("user_login");
+
+      // Запрашиваем полный список пользователей
       s.emit("get_users");
-
-      s.emit("get_dialogs");
-
-      s.on("user_status_updated", (user) => {
-        updateUserProfile(user);
-      });
     });
 
-    s.on("disconnect", () => { });
-
-
-    // ---------------- DIALOG EVENTS ----------------
-    s.on("dialogs_list", (dialogs: Dialog[]) => setDialogs(dialogs));
-
-    s.on("messages_list", (dialogId: string, messages: Message[]) =>
-      setDialogMessages(dialogId, messages)
-    );
-
-    s.on("new_message", (message: Message) => {
-      const { messages } = useChatStore.getState();
-      const dialogMessages = messages[message.dialogId] || [];
-      useChatStore.setState({
-        messages: {
-          ...messages,
-          [message.dialogId]: [...dialogMessages, message],
-        },
-      });
+    // ---------------- Список пользователей ----------------
+    s.on("users_list", (users: SafeUser[]) => {
+      setUsers(users);
     });
 
+    // ---------------- Обновление статуса пользователей ----------------
+    s.on("user_status_updated", (user) => {
+      if (!user) return;
+      updateUserStatus(user.id, user.online, user.lastSeen);
+    });
 
-    s.on("message_deleted", (messageId: string, dialogId: string) =>
-      deleteMessage(dialogId, messageId)
-    );
+    // ---------------- DISCONNECT ----------------
+    s.on("disconnect", (reason) => {
+      console.log("Socket disconnected:", reason);
+    });
 
-    // ---------------- USER STATUS ----------------
+    s.connect();
+  }, [user?.id, socket, setUsers, updateUserStatus]);
 
-    // ---------------- USER PROFILE ----------------
-    s.on("user_updated", (user: User) => updateUserProfile(user));
+  // -------- Подключаем сокет при логине --------
+  useEffect(() => {
+    if (user?.id) {
+      connectSocket();
+    } else if (socket) {
+      // Если юзер разлогинился, отключаем сокет
+      socket.emit("user_logout");
+      socket.disconnect();
+      setSocket(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
-    // ---------------- TYPING ----------------
-    s.on("user_typing", ({ dialogId }: { dialogId: string }) =>
-      startTyping(dialogId)
-    );
-    s.on("user_stop_typing", ({ dialogId }: { dialogId: string }) =>
-      stopTyping(dialogId)
-    );
-
+  // Очистка при размонтировании
+  useEffect(() => {
     return () => {
-      s.offAny();
+      if (socket) {
+        socket.disconnect();
+      }
     };
-  }, [user, socket, setDialogs, setDialogMessages, deleteMessage, updateUserProfile, startTyping, stopTyping]);
+  }, [socket]);
 
   return <SocketContext.Provider value={{ socket }}>{children}</SocketContext.Provider>;
 };

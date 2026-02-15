@@ -2,14 +2,17 @@ import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 
-import type { User } from "../types.js";
+import type { ServerUser } from "../types.js";
+
+/*================================================================
+AUTH
+================================================================*/
 
 // ================== Инициализация БД ==================
 const db = new Database("./src/db/app.db");
 
 // Создание таблицы users, если её нет
-db.prepare(
-  `
+db.prepare(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -21,10 +24,7 @@ db.prepare(
     online INTEGER DEFAULT 0,
     last_seen INTEGER
   )
-`,
-).run();
-
-// ================== Функции ==================
+`).run();
 
 /**
  * Создание нового пользователя с хэшированием пароля
@@ -36,7 +36,7 @@ export const createUser = (data: {
   last_name?: string;
   email?: string;
   photo_url?: string;
-}): User => {
+}): ServerUser => {
   const id = uuidv4();
 
   const stmt = db.prepare(`
@@ -58,101 +58,81 @@ export const createUser = (data: {
     id,
     username: data.username,
     password: data.password,
+    email: data.email,
     first_name: data.first_name,
     last_name: data.last_name,
-    email: data.email,
     photo_url: data.photo_url,
+    sockets: new Set(),
+    online: false,
+    lastSeen: 0,
   };
-};
-
-/**
- * Получение пользователя по ID
- */
-export const getUserById = (id: string): User | null => {
-  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
-    | User
-    | undefined;
-  return row || null;
-};
-
-/**
- * Получение пользователя по username
- */
-export const getUserByUsername = (username: string): User | null => {
-  const row = db
-    .prepare("SELECT * FROM users WHERE username = ?")
-    .get(username) as User | undefined;
-  return row || null;
-};
-
-/**
- * Обновление профиля пользователя
- */
-export const updateUserProfile = (
-  id: string,
-  data: Partial<Omit<User, "id" | "password">>,
-): User | null => {
-  const user = getUserById(id);
-  if (!user) return null;
-
-  const updated = { ...user, ...data };
-
-  const stmt = db.prepare(`
-    UPDATE users SET
-      first_name=@first_name,
-      last_name=@last_name,
-      email=@email,
-      username=@username,
-      photo_url=@photo_url
-    WHERE id=@id
-  `);
-
-  stmt.run({
-    id,
-    first_name: updated.first_name || "",
-    last_name: updated.last_name || "",
-    email: updated.email || null,
-    username: updated.username,
-    photo_url: updated.photo_url || "",
-  });
-
-  return updated;
 };
 
 /**
  * Проверка пароля пользователя
  */
-export const verifyPassword = (
-  username: string,
-  plainPassword: string,
-): boolean => {
+export const verifyPassword = (username: string, plainPassword: string): boolean => {
   const user = getUserByUsername(username);
   if (!user) return false;
 
   return bcrypt.compareSync(plainPassword, user.password);
 };
 
-// ================== ЧАТ: ВСЕ ПОЛЬЗОВАТЕЛИ ==================
+/*================================================================
+CHAT
+================================================================*/
+
 /**
- * Получение всех пользователей из базы для чата
+ * Преобразуем строки из базы в ServerUser
  */
-export const getAllUsersFromDB = (): User[] => {
-  const rows = db.prepare("SELECT * FROM users").all() as User[];
-  return rows;
+const rowToServerUser = (row: any): ServerUser => ({
+  id: row.id,
+  username: row.username,
+  password: row.password ?? "", // хэш
+  email: row.email,
+  first_name: row.first_name,
+  last_name: row.last_name,
+  photo_url: row.photo_url,
+  sockets: new Set(),
+  online: !!row.online,
+  lastSeen: row.last_seen ?? 0,
+});
+
+/**
+ * Получение пользователя по username
+ */
+export const getUserByUsername = (username: string): ServerUser | null => {
+  const row = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+  return row ? rowToServerUser(row) : null;
 };
 
-export const setUserOnlineStatus = (
-  id: string,
-  online: boolean,
-): User | null => {
+/**
+ * Получение пользователя по ID
+ */
+export const getUserById = (id: string): ServerUser | null => {
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+  return row ? rowToServerUser(row) : null;
+};
+
+/**
+ * Получение всех пользователей
+ */
+export const getAllUsersFromDB = (): ServerUser[] => {
+  const rows = db.prepare("SELECT * FROM users").all();
+  return rows.map(rowToServerUser);
+};
+
+/**
+ * Установка online статуса пользователя
+ */
+export const setUserOnlineStatus = (id: string, online: boolean): ServerUser | null => {
   const now = Date.now();
-  const stmt = db.prepare(`
+  db.prepare(`
     UPDATE users SET online=@online, last_seen=@lastSeen WHERE id=@id
-  `);
-  stmt.run({
+  `).run({
     id,
     online: online ? 1 : 0,
-    lastSeen: online ? null : now, // online=true → lastSeen=null, offline → ставим время выхода
+    lastSeen: online ? null : now,
   });
 
   return getUserById(id);
