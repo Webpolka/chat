@@ -10,7 +10,7 @@ export const NotFoundPage: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-gray-900 text-white px-4">
+    <div className="layout h-screen flex flex-col items-center justify-center bg-gray-900 text-white px-4">
       <h1 className="text-6xl font-bold mb-4">404</h1>
       <p className="text-xl mb-8 text-center">
         Страница не найдена. Возможно, ссылка устарела или вы ошиблись с URL.

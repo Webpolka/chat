@@ -12,7 +12,8 @@ AUTH
 const db = new Database("./src/db/app.db");
 
 // Создание таблицы users, если её нет
-db.prepare(`
+db.prepare(
+  `
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -21,10 +22,13 @@ db.prepare(`
     last_name TEXT,
     email TEXT UNIQUE,
     photo_url TEXT,
+    bio TEXT DEFAULT '',
+    createdAt INTEGER NOT NULL,
     online INTEGER DEFAULT 0,
     last_seen INTEGER
-  )
-`).run();
+)
+`,
+).run();
 
 /**
  * Создание нового пользователя с хэшированием пароля
@@ -32,17 +36,26 @@ db.prepare(`
 export const createUser = (data: {
   username: string;
   password: string;
+  createdAt: number;
+
   first_name?: string;
   last_name?: string;
+  bio?: string;
+
   email?: string;
   photo_url?: string;
 }): ServerUser => {
   const id = uuidv4();
 
   const stmt = db.prepare(`
-    INSERT INTO users (id, username, password, first_name, last_name, email, photo_url)
-    VALUES (@id, @username, @password, @first_name, @last_name, @email, @photo_url)
-  `);
+  INSERT INTO users (
+    id, username, password, first_name, last_name, email, photo_url, bio, createdAt
+  ) VALUES (
+    @id, @username, @password, @first_name, @last_name, @email, @photo_url, @bio, @createdAt
+  )
+`);
+
+  const now = Date.now();
 
   stmt.run({
     id,
@@ -52,6 +65,8 @@ export const createUser = (data: {
     last_name: data.last_name || "",
     email: data.email || null,
     photo_url: data.photo_url || "",
+    bio: data.bio || "",
+    createdAt: data.createdAt || now,
   });
 
   return {
@@ -62,6 +77,8 @@ export const createUser = (data: {
     first_name: data.first_name,
     last_name: data.last_name,
     photo_url: data.photo_url,
+    bio: data.bio,
+    createdAt: data.createdAt || now,
     sockets: new Set(),
     online: false,
     lastSeen: 0,
@@ -69,9 +86,116 @@ export const createUser = (data: {
 };
 
 /**
+ * Смена пароля пользователя
+ */
+export const changePassword = (data: {
+  id: string;
+  currentPassword: string;
+  newPassword: string;
+}): ServerUser => {
+  const user = getUserById(data.id);
+  if (!user) throw new Error("Пользователь не найден");
+
+  // ===== 1. Проверяем текущий пароль =====
+  const isMatch = bcrypt.compareSync(
+    data.currentPassword.trim(),
+    user.password.trim(),
+  );
+
+  if (!isMatch) {
+    throw new Error("Неверный текущий пароль");
+  }
+
+  // ===== 3. Обновляем в базе =====
+  db.prepare(
+    `
+    UPDATE users
+    SET password=@password
+    WHERE id=@id
+  `,
+  ).run({
+    id: data.id,
+    password: data.newPassword,
+  });
+
+  // ===== 4. Возвращаем обновленного юзера =====
+  return getUserById(data.id)!;
+};
+
+/**
+ * Обновление пользователя
+ */
+export const updateUser = (data: {
+  id: string; // обязательный для идентификации
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  bio?: string;
+  photo_url?: string;
+}): ServerUser => {
+  const user = getUserById(data.id);
+  if (!user) throw new Error("Пользователь не найден");
+
+  // Формируем объект для обновления
+  const updated = {
+    username: data.username ?? user.username,
+    first_name: data.first_name ?? user.first_name,
+    last_name: data.last_name ?? user.last_name,
+    email: data.email ?? user.email,
+    bio: data.bio ?? user.bio,
+    photo_url: data.photo_url ?? user.photo_url,
+  };
+
+  // Выполняем UPDATE в базе
+  db.prepare(
+    `
+    UPDATE users
+    SET username=@username,
+        first_name=@first_name,
+        last_name=@last_name,
+        email=@email,
+        bio=@bio,
+        photo_url=@photo_url
+    WHERE id=@id
+  `,
+  ).run({
+    id: data.id,
+    ...updated,
+  });
+
+  // Возвращаем обновленного пользователя
+  return getUserById(data.id)!;
+};
+
+/**
+ * Удаление пользователя (с проверкой пароля)
+ */
+export const deleteUser = (data: { id: string; password: string }): boolean => {
+  const user = getUserById(data.id);
+  if (!user) throw new Error("Пользователь не найден");
+
+  // Проверяем пароль
+  const isValid = bcrypt.compareSync(data.password, user.password);
+  if (!isValid) {
+    throw new Error("Неверный пароль"); // если пароль не совпадает — false через исключение
+  }
+
+  // Удаляем пользователя
+  db.prepare(`DELETE FROM users WHERE id = ?`).run(data.id);
+
+  // Если дошли сюда — значит удаление прошло
+  return true;
+};
+
+
+/**
  * Проверка пароля пользователя
  */
-export const verifyPassword = (username: string, plainPassword: string): boolean => {
+export const verifyPassword = (
+  username: string,
+  plainPassword: string,
+): boolean => {
   const user = getUserByUsername(username);
   if (!user) return false;
 
@@ -92,6 +216,8 @@ const rowToServerUser = (row: any): ServerUser => ({
   email: row.email,
   first_name: row.first_name,
   last_name: row.last_name,
+  bio: row.bio ?? "",
+  createdAt: row.createdAt ?? row.created_at ?? Date.now(),
   photo_url: row.photo_url,
   sockets: new Set(),
   online: !!row.online,
@@ -102,7 +228,9 @@ const rowToServerUser = (row: any): ServerUser => ({
  * Получение пользователя по username
  */
 export const getUserByUsername = (username: string): ServerUser | null => {
-  const row = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+  const row = db
+    .prepare("SELECT * FROM users WHERE username = ?")
+    .get(username);
   return row ? rowToServerUser(row) : null;
 };
 
@@ -125,15 +253,33 @@ export const getAllUsersFromDB = (): ServerUser[] => {
 /**
  * Установка online статуса пользователя
  */
-export const setUserOnlineStatus = (id: string, online: boolean): ServerUser | null => {
+export const setUserOnlineStatus = (
+  id: string,
+  online: boolean,
+): ServerUser | null => {
   const now = Date.now();
-  db.prepare(`
-    UPDATE users SET online=@online, last_seen=@lastSeen WHERE id=@id
-  `).run({
+
+  // Сначала получаем текущего пользователя
+  const user = getUserById(id);
+  if (!user) return null; // если нет такого пользователя
+
+  // Вычисляем lastSeen: если онлайн — оставляем прошлое значение, если offline — ставим сейчас
+  const lastSeen = online ? user.lastSeen : now;
+
+  // Обновляем БД
+  db.prepare(
+    `
+    UPDATE users
+    SET online=@online,
+        last_seen=@lastSeen
+    WHERE id=@id
+  `,
+  ).run({
     id,
     online: online ? 1 : 0,
-    lastSeen: online ? null : now,
+    lastSeen,
   });
 
+  // Возвращаем обновленного пользователя
   return getUserById(id);
 };

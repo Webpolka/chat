@@ -65,7 +65,7 @@ if (fs.existsSync(frontendPath)) {
 // ---------------------- Инициализация сервера ----------------------
 
 try {
-  initChatServer(io); // модуль шашек
+  initChatServer(io); // модуль 
 } catch (err) {
   console.error("Checkers module failed:", err);
 }

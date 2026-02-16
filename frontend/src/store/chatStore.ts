@@ -1,5 +1,6 @@
 // src/store/chatStore.ts
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { SafeUser } from "../types/types";
 import { getSocket } from "@/app/providers/socket/socket";
 
@@ -8,7 +9,9 @@ type ChatState = {
   users: Record<string, SafeUser>;
 
   // ---------------- Current user ----------------
-  setCurrentUserId: (userId: string) => void;
+  currentUser: SafeUser | null;
+  setCurrentUser: (user: SafeUser | null) => void;
+  setCurrentUserId: (userId: string | null) => void;
 
   // ---------------- Users ----------------
   setUsers: (users: SafeUser[]) => void;
@@ -22,37 +25,55 @@ type ChatState = {
   initSocketListeners: () => void;
 };
 
-export const useChatStore = create<ChatState>()((set, get) => ({
-  currentUserId: null,
-  users: {},
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
+      currentUserId: null,
+      currentUser: null,
+      users: {},
 
-  // ---------------- Current user ----------------
-  setCurrentUserId: (userId) => set({ currentUserId: userId }),
+      // ---------------- Current user ----------------
+      setCurrentUserId: (userId) => set({ currentUserId: userId }),
+      setCurrentUser: (user) => set({ currentUser: user }),
 
-  // ---------------- Users ----------------
-  setUsers: (users) =>
-    set(() => ({
-      users: Object.fromEntries(users.map((u) => [u.id, u])),
-    })),
+      // ---------------- Users ----------------
+      setUsers: (users) =>
+        set(() => ({
+          users: Object.fromEntries(users.map((u) => [u.id, u])),
+        })),
 
-  updateUserStatus: (userId, online, lastSeen) => {
-    const users = { ...get().users };
-    if (!users[userId]) return;
-    users[userId] = { ...users[userId], online, lastSeen: lastSeen ?? 0 };
-    set({ users });
-  },
+      updateUserStatus: (userId, online, lastSeen) => {
+        const users = { ...get().users };
+        if (!users[userId]) return;
+        users[userId] = { ...users[userId], online, lastSeen: lastSeen ?? 0 };
+        set({ users });
+      },
 
-  // ---------------- Socket ----------------
-  initSocketListeners: () => {
-    const socket = getSocket();
-    if (!socket) return;
+      // ---------------- Socket ----------------
+      initSocketListeners: () => {
+        const socket = getSocket();
+        if (!socket) return;
 
-    socket.on("user_status_updated", (user: SafeUser) => {
-      get().updateUserStatus(user.id, user.online ?? false, user.lastSeen ?? 0);
-    });
+        socket.on("user_status_updated", (user: SafeUser) => {
+          get().updateUserStatus(
+            user.id,
+            user.online ?? false,
+            user.lastSeen ?? 0,
+          );
+        });
 
-    socket.on("users_list", (users: SafeUser[]) => {
-      get().setUsers(users);
-    });
-  },
-}));
+        socket.on("users_list", (users: SafeUser[]) => {
+          get().setUsers(users);
+        });
+      },
+    }),
+    {
+      name: "chat-storage", // ключ в localStorage
+      partialize: (state) => ({
+        currentUserId: state.currentUserId,
+        currentUser: state.currentUser,
+        users: state.users,
+      }),
+    },
+  ),
+);

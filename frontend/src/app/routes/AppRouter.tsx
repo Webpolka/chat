@@ -1,15 +1,11 @@
-// src/app/providers/router/AppRouter.tsx
+// src/app/routes/AppRouter.tsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import { MainPage } from "@/pages/MainPage";
 import { ChatPage } from "@/pages/ChatPage";
-import { RequireAuth } from "./requireAuth";
-
-
-import { SocketProvider } from "@/app/providers/socket/SocketProvider";
-
+import { ProfilePage } from "@/pages/ProfilePage";
+import { ProtectedRoutes } from "./ProtectedRoutes";
 
 export const AppRouter = () => {
-
   return (
     <Routes>
       {/* Главная и регистрация доступны без авторизации */}
@@ -18,12 +14,9 @@ export const AppRouter = () => {
       <Route path="/register" element={<MainPage />} />
 
       {/* Защищённые маршруты */}
-      <Route element={<RequireAuth />}>
-        <Route path="/chat" element={
-          <SocketProvider>            
-            <ChatPage />
-          </SocketProvider>
-        } />
+      <Route element={<ProtectedRoutes />}>
+        <Route path="/chat" element={<ChatPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
 
       {/* Неизвестные пути */}

@@ -17,6 +17,9 @@ export const initChatServer = (io: SocketServer) => {
     first_name: user.first_name,
     last_name: user.last_name,
     photo_url: user.photo_url,
+    bio: user.bio,
+    email: user.email,
+    createdAt: user.createdAt,
     online: user.online ?? false,
     lastSeen: user.lastSeen ?? 0,
   });
@@ -44,6 +47,20 @@ export const initChatServer = (io: SocketServer) => {
     }
   });
 
+  // -------- Polling для новых пользователей --------
+  let lastUserCount = getAllUsersFromDB().length;
+  const POLLING_INTERVAL = 5000; // 5 секунд
+
+  setInterval(() => {
+    const users = getAllUsersFromDB();
+    if (users.length !== lastUserCount) {
+      lastUserCount = users.length;
+
+      // Отправляем всем клиентам актуальный список пользователей
+      io.emit("users_list", users.map(toSafeUser));
+    }
+  }, POLLING_INTERVAL);
+
   // -------- CONNECTION --------
   io.on("connection", (socket) => {
     const userId = socket.data.userId as string;
@@ -52,7 +69,7 @@ export const initChatServer = (io: SocketServer) => {
     // =====  Получаем пользователя из БД =====
     const dbUser: ServerUser | null = getUserById(userId);
     if (!dbUser) return socket.disconnect();
-    
+
     // ==== Запрос фронта: юзер логинится =====
     socket.on("user_login", () => {
       const onlineUser = setUserOnlineStatus(userId, true);

@@ -1,5 +1,38 @@
 @import "tailwindcss";
 
+@theme {
+  --font-body: "Roboto", sans-serif;
+  --font-heading: "Montserrat", sans-serif;
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1440px;
+
+  --container-padding: 16px;
+  --max-width-container: 1440px;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    color: #1f2937; /* Tailwind gray-800 */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: #111827; /* Tailwind gray-900 */
+  }
+}
+
+.layout {
+  max-width: var(--max-width-container);
+  margin: 0 auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
 @keyframes gradient-x {
 
   0%,

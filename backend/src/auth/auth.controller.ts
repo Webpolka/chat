@@ -4,6 +4,9 @@ import {
   registerService,
   refreshService,
   logoutService,
+  updateService,
+  changePasswordService,
+  deleteAccountService,
 } from "./auth.service.js";
 import { saveAvatar } from "../utils/saveAvatar.js";
 
@@ -53,6 +56,125 @@ export const registerController = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Register error:", err);
     res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /auth/update
+ * Обновление профиля пользователя и установка новых httpOnly cookies с токенами
+ * (требует авторизации, т.е. наличия валидного accessToken в cookies)
+ */
+export const updateController = async (req: Request, res: Response) => {
+  try {
+    const { id, username, first_name, last_name, email, bio } = req.body;
+
+    let avatarUrl: string | undefined;
+    if (req.file) {
+      avatarUrl = await saveAvatar(req.file);
+    }
+
+    const { user, tokens } = await updateService({
+      id,
+      username,
+      first_name,
+      last_name,
+      email,
+      bio,
+      avatarUrl,
+    });
+
+    // Установка httpOnly cookies
+    res.cookie("accessToken", tokens.accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+
+    res.cookie("refreshToken", tokens.refreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+
+    res.json({ ok: true, user });
+  } catch (err: any) {
+    console.error("Update user error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /auth/change-password
+ * Смена пароля пользователя и установка новых httpOnly cookies с токенами
+ * (требует авторизации, т.е. наличия валидного accessToken в cookies)
+ */
+export const changePasswordController = async (req: Request, res: Response) => {
+  try {
+    const { id, currentPassword, newPassword } = req.body;
+
+    const { user, tokens } = await changePasswordService({
+      id,
+      currentPassword,
+      newPassword,
+    });
+
+    // Установка httpOnly cookies
+    res.cookie("accessToken", tokens.accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+
+    res.cookie("refreshToken", tokens.refreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+
+    res.json({ ok: true, user });
+  } catch (err: any) {
+    console.error("Change password error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /auth/delete-account
+ * Удаление аккаунта пользователя и очистка httpOnly cookies
+ */
+// ================= Controller =================
+export const deleteAccountController = async (req: Request, res: Response) => {
+  try {
+    const { id, password } = req.body;
+
+    const { ok } = deleteAccountService({ id, password });
+
+    if (!ok) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Не удалось удалить аккаунт" });
+    }
+
+    // Очистка токенов после удаления
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+    });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    res.json({ ok: true }); // тут больше юзера не возвращаем
+  } catch (err: any) {
+    console.error("Delete account error:", err);
+    res.status(500).json({ error: err.message || "Ошибка удаления аккаунта" });
   }
 };
 
@@ -132,7 +254,6 @@ export const refreshController = (req: Request, res: Response) => {
  * Очистка токенов и httpOnly cookies
  */
 export const logoutController = (_req: Request, res: Response) => {
-  
   logoutService(); // Можно расширить логику (например, инвалидировать refresh токены)
 
   res.clearCookie("accessToken", {

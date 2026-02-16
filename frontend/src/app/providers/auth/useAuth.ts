@@ -17,6 +17,24 @@ export type AuthContextType = {
     avatar: File;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  update: (updateData: {
+    id: string;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    bio?: string;
+    avatar?: File | null;
+  }) => Promise<void>;
+  changePassword: (passwordData: {
+    id: string;
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
+  deleteAccount: (passwordData: {
+    id: string;
+    password: string;
+  }) => Promise<boolean>;
 };
 
 /**

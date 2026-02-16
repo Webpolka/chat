@@ -1,11 +1,10 @@
 // src/app/providers/socket/SocketProvider.tsx
-import React, { useEffect, useState, useCallback } from "react";
-import { Socket } from "socket.io-client";
+import React, { useEffect, useState } from "react";
 import { SocketContext } from "./useSocket";
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import { useChatStore } from "@/store/chatStore";
-import type { SafeUser } from "@/types/types";
 import { useAuth } from "../auth/useAuth";
+import type { SafeUser } from "@/types/types";
 
 interface Props {
   children: React.ReactNode;
@@ -18,69 +17,48 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
 
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  // -------- Создание нового сокета --------
-  const connectSocket = useCallback(() => {
+  useEffect(() => {
     if (!user?.id) return;
 
-    // Закрываем старый сокет, если есть
-    if (socket) {
-      socket.disconnect();
-    }
-
     const s = io({ autoConnect: false });
-    setSocket(s);
 
-    // ---------------- CONNECT ----------------
-    s.on("connect", () => {
+    // --------- События сокета ---------
+    const handleConnect = () => {
       console.log("Socket connected:", s.id);
-
-      // Сообщаем серверу, что юзер вошёл
       s.emit("user_login");
-
-      // Запрашиваем полный список пользователей
       s.emit("get_users");
-    });
+    };
 
-    // ---------------- Список пользователей ----------------
-    s.on("users_list", (users: SafeUser[]) => {
+    const handleUsersList = (users: SafeUser[]) => {
       setUsers(users);
-    });
+    };
 
-    // ---------------- Обновление статуса пользователей ----------------
-    s.on("user_status_updated", (user) => {
-      if (!user) return;
-      updateUserStatus(user.id, user.online, user.lastSeen);
-    });
+    const handleUserStatus = (u: SafeUser) => {
+      if (!u) return;
+      updateUserStatus(u.id, u.online, u.lastSeen);
+    };
 
-    // ---------------- DISCONNECT ----------------
-    s.on("disconnect", (reason) => {
+    const handleDisconnect = (reason: string) => {
       console.log("Socket disconnected:", reason);
-    });
+    };
+
+    s.on("connect", handleConnect);
+    s.on("users_list", handleUsersList);
+    s.on("user_status_updated", handleUserStatus);
+    s.on("disconnect", handleDisconnect);
 
     s.connect();
-  }, [user?.id, socket, setUsers, updateUserStatus]);
+    queueMicrotask(() => {
+      setSocket(s);
+    })
 
-  // -------- Подключаем сокет при логине --------
-  useEffect(() => {
-    if (user?.id) {
-      connectSocket();
-    } else if (socket) {
-      // Если юзер разлогинился, отключаем сокет
-      socket.emit("user_logout");
-      socket.disconnect();
-      setSocket(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
 
-  // Очистка при размонтировании
-  useEffect(() => {
+    // Очистка при размонтировании или логауте
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      s.emit("user_logout");
+      s.disconnect();
     };
-  }, [socket]);
+  }, [user?.id, setUsers, updateUserStatus]);
 
   return <SocketContext.Provider value={{ socket }}>{children}</SocketContext.Provider>;
 };

@@ -4,6 +4,8 @@ import { AuthContext, type AuthContextType } from "./useAuth";
 import { api } from "@/shared/api/axios"; // axios с baseURL настроенным
 import type { User } from "@/types/types";
 import { AxiosError } from "axios";
+import { useChatStore } from "@/store/chatStore";
+import { useMemo } from "react";
 
 type Props = { children: ReactNode };
 /**
@@ -41,7 +43,13 @@ export const AuthProvider = ({ children }: Props) => {
       if (data.ok) {
         setUser(data.user);
         setIsAuth(true);
-      } else {
+
+        // Добавляем в стор zustand данные текущего пользователя, чтобы можно было использовать их в чатах и при подключении сокета
+        const store = useChatStore.getState();
+        store.setCurrentUser(data.user);
+        store.setCurrentUserId(data.user.id);
+      }
+      else {
         setUser(null);
         setIsAuth(false);
       }
@@ -76,6 +84,10 @@ export const AuthProvider = ({ children }: Props) => {
       if (data.ok && data.user) {
         setUser(data.user);  // сохраняем пользователя
         setIsAuth(true);
+
+        const store = useChatStore.getState();
+        store.setCurrentUser(data.user);
+        store.setCurrentUserId(data.user.id);
         console.log("Login success ! Data of current User :", data.user);
       } else {
         setUser(null);
@@ -109,6 +121,11 @@ export const AuthProvider = ({ children }: Props) => {
 
       setUser(data.user);
       setIsAuth(true);
+
+      const store = useChatStore.getState();
+      store.setCurrentUser(data.user);
+      store.setCurrentUserId(data.user.id);
+
     } catch (err) {
       setIsAuth(false);
       setUser(null);
@@ -129,21 +146,154 @@ export const AuthProvider = ({ children }: Props) => {
     } finally {
       setIsAuth(false);
       setUser(null);
+
+      // Удаляем данные текущего пользователя из стора zustand, чтобы при отключении сокета не было данных о пользователе
+      const store = useChatStore.getState();
+      store.setCurrentUser(null);
+      store.setCurrentUserId(null);
+      store.setUsers([]); // очистить список
+
       console.log("User logged out");
     }
   };
 
 
+  /**
+ * update - обновляет профиль текущего пользователя
+ * profileData может содержать любые поля: username, first_name, last_name, email, bio, avatar
+ */
+  const update = async (profileData: {
+    id: string;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    bio?: string;
+    avatar?: File | null;
+  }) => {
+    if (!user) throw new Error("Нет авторизованного пользователя");
+
+    try {
+      const formData = new FormData();
+
+      // Добавляем поля, если они есть
+      Object.entries(profileData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          // если это файл, просто append
+          if (key === "avatar" && value instanceof File) {
+            formData.append(key, value);
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+
+      // ==== Запрос на сервер ====
+      const { data } = await api.post(`/auth/update`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      // ==== После успешного ответа обновляем локальный стейт и zustand ====
+      setUser(data.user);
+
+      const store = useChatStore.getState();
+      store.setCurrentUser(data.user);
+
+      const updatedUsers = {
+        ...store.users,           // оставляем всех юзеров
+        [data.user.id]: data.user // заменяем/добавляем текущего
+      };
+      store.setUsers(Object.values(updatedUsers));
+
+      return data.user;
+    } catch (err) {
+      console.error("[AuthProvider] update profile error:", err);
+      throw err;
+    }
+  };
+
+
+
+  /**
+* changePassword - меняет пароль текущего пользователя
+* passwordData содержит id пользователя, текущий пароль и новый пароль
+ */
+  const changePassword = async (passwordData: {
+    id: string;
+    currentPassword: string;
+    newPassword: string;
+  }) => {
+    if (!user) throw new Error("Нет авторизованного пользователя");
+
+    try {
+      const { data } = await api.post("/auth/change-password", passwordData, {
+        withCredentials: true,
+      });
+
+      if (!data.ok) {
+        throw new Error(data.error || "Ошибка смены пароля");
+      }
+
+      return data.user;
+    } catch (err) {
+      console.error("[AuthProvider] change password error:", err);
+      throw err;
+    }
+  };
+
+
+
+  /**
+* deleteAccount - удаляет аккаунт текущего пользователя
+* deleteData содержит id пользователя и пароль для подтверждения  
+ */
+  const deleteAccount = async (deleteData: {
+    id: string;
+    password: string;
+  }) => {
+    if (!user) throw new Error("Нет авторизованного пользователя");
+
+    try {
+      const { data } = await api.post("/auth/delete-account", deleteData, {
+        withCredentials: true,
+      });
+
+      if (!data.ok) {
+        console.error("Ошибка удаления аккаунта:", data.error);
+      }
+      return true;
+    } catch (err) {
+      console.error("[AuthProvider] delete account error:", err);
+      return false;
+    } finally {
+      setIsAuth(false);
+      setUser(null);
+
+      // Удаляем данные текущего пользователя из стора zustand, чтобы при отключении сокета не было данных о пользователе
+      const store = useChatStore.getState();
+      store.setCurrentUser(null);
+      store.setCurrentUserId(null);
+      store.setUsers([]); // очистить список
+    }
+  };
+
+
+
   // Контекст передаем детям
-  const value: AuthContextType = {
+  const contextValue: AuthContextType = useMemo(() => ({
     isAuth,
     loading,
+    user,
     checkAuth,
     login,
     logout,
     register,
-    user,
-  };
+    update,
+    changePassword,
+    deleteAccount
+  }), [isAuth, loading, user]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+
 };
