@@ -110,9 +110,9 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ profile }) => 
 
           <button
             onClick={handleLogout}
-            className="block w-full text-left px-5 py-4 hover:bg-gray-100 transition-colors text-lg font-medium"
+            className="cursor-pointer block w-full text-left px-5 py-4 hover:bg-gray-100 transition-colors text-lg font-medium"
           >
-            Разлогиниться
+            Выйти из аккаунта
           </button>
         </div>
       )}

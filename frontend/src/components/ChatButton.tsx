@@ -37,7 +37,7 @@ export const ChatButton: FC<ChatButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        "px-8 py-3 text-white font-semibold rounded-xl backdrop-blur-sm transition-all duration-300",
+        "px-4 md:px-8 py-3 text-sm sm:text-lg text-white font-semibold rounded-xl backdrop-blur-sm transition-all duration-300",
         
         // если не disabled → hover эффекты
         !disabled && "hover:scale-105 cursor-pointer",

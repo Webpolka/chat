@@ -19,7 +19,7 @@ export const MainPage = () => {
   }, [isAuth, loading, navigate]);
 
   return (
-    <div className="layout relative h-screen w-full flex flex-col items-center justify-center bg-indigo-500 login-bg">
+    <div className="relative h-screen w-full flex flex-col items-center justify-center bg-indigo-500 login-bg">
 
       {/* ===== Полупрозрачный градиент сверху ===== */}
       <div className="absolute inset-0 bg-black/40"></div>

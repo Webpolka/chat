@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({ pageTitle }) => {
   const isProfilePage = location.pathname === "/profile";
 
   return (
-    <header className="rounded-b-2xl flex justify-between items-center p-4 bg-white shadow-[0_4px_25px_rgba(100,149,237,0.25)] px-4 sm:px-6 md:px-8">
+    <header className="sticky top-0 z-10 rounded-b-2xl flex justify-between items-center p-4 bg-white shadow-[0_4px_25px_rgba(100,149,237,0.45)] px-4 sm:px-6 md:px-8">
       <div className="flex items-center gap-3">
         {isProfilePage && (
           <button

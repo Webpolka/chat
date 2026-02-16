@@ -5,7 +5,6 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { ChatButton } from "@/components/ChatButton";
 import { useAuth } from "@/app/providers/auth/useAuth";
 
-
 const Tabs = ({
   tabs,
   currentTab,
@@ -15,7 +14,7 @@ const Tabs = ({
   currentTab: string;
   setCurrentTab: (tab: string) => void;
 }) => (
-  <div className="flex gap-4 mb-5">
+  <div className="flex gap-2 sm:gap-4 mb-5 flex-wrap">
     {tabs.map((tab) => (
       <ChatButton
         key={tab}
@@ -155,12 +154,14 @@ export function ProfilePage() {
     }
   };
 
+  
 
   return (
-    <div className="layout flex flex-col min-h-screen bg-gray-50 pb-25">
+
+    <div className="layout flex flex-col pb-15 min-h-[100vh] bg-white/25 rounded-b-4xl shadow-pink-700">
       <Header pageTitle="Мой профиль" />
 
-      <div className="flex-1 p-6 max-w-4xl mx-auto">
+      <div className="flex-1 py-6 max-w-4xl mx-auto w-full">
         <Tabs
           tabs={["Личная информация", "Безопасность", "Аккаунт"]}
           currentTab={currentTab}
@@ -168,128 +169,131 @@ export function ProfilePage() {
         />
 
         {currentTab === "Личная информация" && (
-          <div className="flex flex-col gap-5">
-            <ProfileAvatar
-              avatarPreview={avatarPreview}
-              onChangeAvatar={(file, preview) => {
-                setAvatarFile(file);
-                setAvatarPreview(preview);
-              }}
-            />
+          <div className="flex flex-col gap-5 max-w-4xl">
+            <div className="flex flex-col gap-5 w-full bg-white rounded-xl p-6 shadow-sm border border-red-200 ">
+              <ProfileAvatar
+                avatarPreview={avatarPreview}
+                onChangeAvatar={(file, preview) => {
+                  setAvatarFile(file);
+                  setAvatarPreview(preview);
+                }}
+              />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <input
-                type="text"
-                placeholder="Никнейм"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Имя"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Фамилия"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              />
-              <input
-                type="email"
-                placeholder="Емail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              />
-              <textarea
-                placeholder="Статус/биография"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 md:col-span-2 resize-none"
-                rows={4}
-              />
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <input
+                  type="text"
+                  placeholder="Никнейм"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Имя"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Фамилия"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
+                <input
+                  type="email"
+                  placeholder="Емail"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
+                <textarea
+                  placeholder="Статус/биография"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 md:col-span-2 resize-none"
+                  rows={4}
+                />
+              </div>
 
-            <div className="flex justify-center">
-              <ChatButton onClick={handleSave} variant="green" className="w-full">
-                Сохранить
-              </ChatButton>
+              <div className="flex justify-center">
+                <ChatButton onClick={handleSave} variant="green" className="w-full">
+                  Сохранить
+                </ChatButton>
+              </div>
             </div>
           </div>
         )}
 
         {currentTab === "Безопасность" && (
-          <div className="flex flex-col gap-6 max-w-xl">
+          <div className="flex flex-col gap-6 max-w-4xl">
+            <div className="flex flex-col gap-5 w-full bg-white rounded-xl p-6 shadow-sm border border-red-200 ">
 
-            <div className="text-xl font-semibold">
-              Смена пароля
+              <div className="text-xl font-semibold">
+                Смена пароля
+              </div>
+
+              <input
+                type="password"
+                placeholder="Текущий пароль"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+
+              <input
+                type="password"
+                placeholder="Новый пароль"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+
+              <input
+                type="password"
+                placeholder="Повторите новый пароль"
+                value={repeatPassword}
+                onChange={(e) => setRepeatPassword(e.target.value)}
+                className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+
+              <div className="flex justify-center pt-2">
+                <ChatButton
+                  onClick={handleChangePassword}
+                  variant="green"
+                  className="w-full"
+                >
+                  {passwordLoading ? "Смена..." : "Изменить пароль"}
+                </ChatButton>
+              </div>
             </div>
-
-            <input
-              type="password"
-              placeholder="Текущий пароль"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-
-            <input
-              type="password"
-              placeholder="Новый пароль"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-
-            <input
-              type="password"
-              placeholder="Повторите новый пароль"
-              value={repeatPassword}
-              onChange={(e) => setRepeatPassword(e.target.value)}
-              className="w-full rounded-lg p-3 text-lg border border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-
-            <div className="flex justify-center pt-2">
-              <ChatButton
-                onClick={handleChangePassword}
-                variant="green"
-                className="w-full"
-              >
-                {passwordLoading ? "Смена..." : "Изменить пароль"}
-              </ChatButton>
-            </div>
-
           </div>
         )}
 
 
         {currentTab === "Аккаунт" && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 max-w-4xl">
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-red-200">
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-red-200 ">
               <h2 className="text-xl font-semibold text-red-600 mb-4">
                 Удаление аккаунта
               </h2>
 
               <p className="text-gray-500 mb-6">
-                Аккаунт удалится навсегда. Сообщения и данные восстановить будет нельзя.
+                Аккаунт удалится навсегда. <br />Сообщения и данные восстановить будет нельзя.
               </p>
 
               {/* === строка пароль + кнопка === */}
-              <div className="flex gap-3 items-center">
+              <div className="flex flex-col gap-3">
 
                 <input
                   type="password"
                   placeholder="Введите пароль"
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
-                  className="flex-1 rounded-lg p-3 text-lg border border-gray-400 
-          focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  className="w-full flex-1 rounded-lg p-3 text-lg border border-gray-400 
+          focus:outline-none focus:ring-2 focus:ring-gray-400 placeholder:text-gray-400"
                 />
 
                 <ChatButton
@@ -313,8 +317,8 @@ export function ProfilePage() {
 
           </div>
         )}
-
       </div>
     </div>
+
   );
 }
