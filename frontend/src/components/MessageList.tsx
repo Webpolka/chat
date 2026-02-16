@@ -91,7 +91,7 @@ export const MessageList: React.FC<Props> = ({ onBack }) => {
   };
 
   return (
-    <div className="mt-5 flex flex-col h-full bg-gray-200 rounded-2xl overflow-hidden text-white">
+    <div className="flex w-full flex-col h-full bg-gray-200 pb-5 md:pb-0 md:rounded-2xl overflow-hidden text-white">
 
       {/* ---------- Шапка ---------- */}
       <div className="flex items-center bg-gray-300 border-b border-gray-100 relative">
